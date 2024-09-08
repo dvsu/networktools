@@ -1,3 +1,5 @@
+import re
+from pathlib import Path
 from subprocess import check_output
 
 from .models import NetworkInfo
@@ -22,9 +24,18 @@ class NetworkTools:
         return ".".join(ip_splitted) + ".0/24"
 
     def mac_address(self, interface: str) -> str | None:
-        with open(f"/sys/class/net/{interface}/address") as file:
-            for line in file:
-                return line.strip().replace(":", "").upper()
+        interface_path = Path(f"/sys/class/net/{interface}/address")
+
+        if interface_path.exists():
+            with open(interface_path) as file:
+                for line in file:
+                    return line.strip().replace(":", "").upper()
+
+        output = check_output(["ethtool", "-P", interface]).decode("utf-8").strip().split(" ")
+        pattern = re.compile(r"^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$", re.IGNORECASE)
+
+        if len(output) > 2 and bool(pattern.match(output[2])):
+            return output[2]
 
         return None
 
